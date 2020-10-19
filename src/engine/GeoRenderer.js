@@ -9,12 +9,6 @@ import { gSPViewport } from "../include/gbi"
 
 const canvas = document.querySelector('#gameCanvas')
 
-export function interpolate_vectors(res, a, b) {
-    res[0] = (a[0] + b[0]) / 2.0;
-    res[1] = (a[1] + b[1]) / 2.0;
-    res[2] = (a[2] + b[2]) / 2.0;
-}
-
 const renderModeTable = [
     [
         Gbi.G_RM_OPA_SURF_SURF2,
@@ -44,9 +38,9 @@ class GeoRenderer {
 
         this.gMatStack = new Array(32).fill(0).map(() => new Array(4).fill(0).map(() => new Array(4).fill(0)))
         this.gMatStackInterpolated = new Array(32).fill(0).map(() => new Array(4).fill(0).map(() => new Array(4).fill(0)))
-        this.gMatStackInterpolatedFixed = new Array(32).fill(0).map(() => new Array(4).fill(0).map(() => new Array(4).fill(0)))
-        this.gMtxTbl = new Array(6400).fill(0).map(() => ({pos: [], mtx: [], displayList: []}))
-        this.gMtxTblSize = 0;
+        this.gMtxTbl = []
+        this.sPerspectivePos = []
+        this.sPerspectiveMtx = new Array(4).fill(0).map(() => new Array(4).fill(0))
         this.gMatStackIndex = 0
         this.gAreaUpdateCounter = 0
 
@@ -64,31 +58,32 @@ class GeoRenderer {
         this.ANIM_TYPE_ROTATION              = 5
     }
 
+    interpolate_vectors(res, a, b) {
+        res[0] = (a[0] + b[0]) / 2.0
+        res[1] = (a[1] + b[1]) / 2.0
+        res[2] = (a[2] + b[2]) / 2.0
+    }
+
     mtx_patch_interpolated() {
         
-            if (this.sPerspectiveMtx != null) {
-                Gbi.gSPMatrix2(Game.gDisplayList, this.sPerspectivePos, this.sPerspectiveMtx, Gbi.G_MTX_PROJECTION | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH);
-                // Gbi.gSPMatrix(Game.gDisplayList, this.sPerspectiveMtx, Gbi.G_MTX_PROJECTION | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH);
-            }
-        
-            for (let i = 0; i < this.gMtxTblSize; i++) {
-                let pos = this.gMtxTbl[i].pos;
-                Gbi.gSPMatrix(pos, this.gMtxTbl[i].mtx,
-                          Gbi.G_MTX_MODELVIEW | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH);
-                Gbi.gSPDisplayList(pos, this.gMtxTbl[i].displayList);
-            }
-        
-            if (this.sViewportPos != null) {
-                // let saved = gDisplayListHead;
-                // gDisplayListHead = sViewportPos;
-                // make_viewport_clip_rect(&sPrevViewport);
-                Gbi.gSPViewport2(Game.gDisplayList, Game.gDisplayList.length - 1, sPrevViewport);
-                // gDisplayListHead = saved;
-            }
-        
-            this.gMtxTblSize = 0;
-            this.sPerspectivePos = null;
-            this.sViewportPos = null;
+        if (this.sPerspectivePos != null) {
+            const gfx = []
+            Gbi.gSPMatrix(gfx, this.sPerspectiveMtx, Gbi.G_MTX_PROJECTION | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH)
+            Game.gDisplayList[this.sPerspectivePos] = gfx[0]
+        }
+
+        this.gMtxTbl.forEach(object => {
+            const pos = object.pos
+            const gfx = []
+            Gbi.gSPMatrix(gfx, object.mtx, Gbi.G_MTX_MODELVIEW | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH)
+            Gbi.gSPDisplayList(gfx, object.displayList)
+            Game.gDisplayList[pos] = gfx[0]
+            Game.gDisplayList[pos + 1] = gfx[1]
+        })
+
+        this.gMtxTbl = []
+        this.sPerspectivePos = null
+        this.sViewportPos = null
     }
 
     geo_process_master_list_sub(node) {
@@ -104,14 +99,11 @@ class GeoRenderer {
                 if (modeList[i] == null) throw "need to add render mode - i: " + i
                 Gbi.gDPSetRenderMode(Game.gDisplayList, modeList[i])
                 for (const displayNode of node.wrapper.listHeads[i]) {
-                    // if (this.gMtxTblSize < 6400) {
-                    //     this.gMtxTbl[this.gMtxTblSize].pos = [];
-                    //     this.gMtxTbl[this.gMtxTblSize].mtx = displayNode.transform;
-                    //     this.gMtxTbl[this.gMtxTblSize++].displayList = displayNode.displayList;
-                    // }
-                    // Gbi.gSPMatrix(Game.gDisplayList, displayNode.transformInterpolated, Gbi.G_MTX_MODELVIEW | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH)
-                    // Gbi.gSPDisplayList(Game.gDisplayList, displayNode.displayListInterpolated)
-                    Gbi.gSPMatrix(Game.gDisplayList, displayNode.transform, Gbi.G_MTX_MODELVIEW | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH)
+                    const object = {}
+                    object.pos = Game.gDisplayList.length /// index of the mtx
+                    object.mtx = displayNode.transform
+                    object.displayList = displayNode.displayList
+                    Gbi.gSPMatrix(Game.gDisplayList, displayNode.transformInterpolated, Gbi.G_MTX_MODELVIEW | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH)
                     Gbi.gSPDisplayList(Game.gDisplayList, displayNode.displayListInterpolated)
 
                 }
@@ -172,9 +164,9 @@ class GeoRenderer {
                 const fovInterpolated = (node.wrapper.prevFov + node.wrapper.fov) / 2.0;
                 MathUtil.guPerspective(mtxInterpolated, perspNorm,
                     fovInterpolated, aspect, node.wrapper.near, node.wrapper.far, 1.0)
-                this.sPerspectivePos = Game.gDisplayList[Game.gDisplayList.length-1]
-                this.sPerspectiveMtx = mtx;
                 Gbi.gSPMatrix(Game.gDisplayList, mtxInterpolated, Gbi.G_MTX_PROJECTION | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH)
+                this.sPerspectivePos = Game.gDisplayList.length - 1
+                this.sPerspectiveMtx = mtx
             } else {
                 //Gbi.gSPPerspNormalize(Game.gDisplayList, perspNorm.value)
                 Gbi.gSPMatrix(Game.gDisplayList, mtx, Gbi.G_MTX_PROJECTION | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH)

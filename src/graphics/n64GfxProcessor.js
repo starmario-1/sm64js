@@ -462,6 +462,10 @@ export class n64GfxProcessor {
         this.rdp.viewport_or_scissor_changed = true
     }
 
+    dp_set_scissor(mode, ulx, uly, lrx, lry) {
+        throw "not implemented"
+    }
+
     sp_movemem(type, data, index) {
         if (type == Gbi.G_MV_L) { // load lightData
             this.rsp.current_lights[index] = data
@@ -1041,6 +1045,9 @@ export class n64GfxProcessor {
                     break
                 case Gbi.G_FILLRECT:
                     this.dp_fill_rectangle(args.ulx, args.uly, args.lrx, args.lry)
+                    break
+                case Gbi.G_SETSCISSOR:
+                    this.dp_set_scissor(args.mode, args.ulx, args.uly, args.lrx, args.lry)
                     break
                 case Gbi.G_DL:
                     if (args.branch == 0) {

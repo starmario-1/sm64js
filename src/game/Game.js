@@ -56,6 +56,18 @@ class Game {
         this.create_task_structure()
     }
 
+    make_viewport_clip_rect(viewport) {
+
+        throw "not implemented/tested: make_viewport_clip_rect"
+
+        const vpUlx = (viewport.vp.vtrans[0] - viewport.vp.vscale[0]) / 4 + 1
+        const vpPly = (viewport.vp.vtrans[1] - viewport.vp.vscale[1]) / 4 + 1
+        const vpLrx = (viewport.vp.vtrans[0] + viewport.vp.vscale[0]) / 4 - 1
+        const vpLry = (viewport.vp.vtrans[1] + viewport.vp.vscale[1]) / 4 - 1
+        
+        gDPSetScissor(this.gDisplayList, Gbi.G_SC_NON_INTERLACE, vpUlx, vpPly, vpLrx, vpLry)
+    }
+
     config_gfx_pool() {
         /// some stuff with gfx pools tasks, display lists, probably not necessary for JS
         this.gDisplayList = []

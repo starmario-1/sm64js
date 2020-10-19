@@ -206,6 +206,15 @@ export const SHADER_OPT_ALPHA = (1 << 24)
 export const SHADER_OPT_FOG = (1 << 25)
 export const SHADER_OPT_TEXTURE_EDGE = (1 << 26)
 
+
+/*
+ * G_SETSCISSOR: interlace mode
+ */
+export const G_SC_NON_INTERLACE	    =   0
+export const G_SC_ODD_INTERLACE	    =   3
+export const G_SC_EVEN_INTERLACE    =   2
+
+
 /*
  * G_SETCOMBINE: color combine modes
  */
@@ -493,6 +502,14 @@ export const gDPFillRectangle = (displaylist, ulx, uly, lrx, lry) => {
     })
 }
 
+export const gDPSetScissor = (displaylist, mode, ulx, uly, lrx, lry) => {
+    displaylist.push({
+        words: {
+            w0: G_SETSCISSOR,
+            w1: { mode, ulx, uly, lrx, lry }
+        }
+    })
+}
 
 export const gSPTexture = (displaylist, s, t, level, tile, on) => {
     displaylist.push({
