@@ -15,12 +15,9 @@ export const networkData = {
 
 export const gameData = {}
 
-const sendDataWithOpcode = (bytes, opcode) => {
+const sendData = (bytes) => {
     if (bytes.length == undefined) bytes = Buffer.from(bytes)
-    const newbytes = new Uint8Array(bytes.length + 1)
-    newbytes.set([opcode], 0)
-    newbytes.set(bytes, 1)
-    channel.raw.emit(newbytes)
+    channel.raw.emit(bytes)
 }
 
 channel.onConnect((err) => {
@@ -31,12 +28,7 @@ channel.onConnect((err) => {
 
     channel.onRaw((message) => {
         const bytes = new Uint8Array(message)
-        const opcode = bytes[0]
-        const msgBytes = bytes.slice(1)
-        switch (opcode) {
-            case 0: if (multiplayerReady()) Multi.recvMarioData(msgBytes); break
-            default: throw "unknown opcode"
-        }
+        if (multiplayerReady()) Multi.recvMarioData(bytes)
     })
 
     channel.on('id', msg => { networkData.myChannelID = msg.id })
@@ -66,7 +58,7 @@ export const post_main_loop_one_iteration = (frame) => {
     if (frame % 30 == 0) updateConnectedMsg()
 
     if (multiplayerReady() && frame % 1 == 0) {
-        sendDataWithOpcode(Multi.createMarioProtoMsg(), 0)
+        sendData(Multi.createMarioProtoMsg())
     }
 
 }

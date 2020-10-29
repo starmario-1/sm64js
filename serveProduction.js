@@ -22,23 +22,15 @@ const generateID = () => {
     return currentId
 }
 
-const broadcastDataWithOpcode = (bytes, opcode) => {
+const broadcastData = (bytes) => {
     if (bytes.length == undefined) bytes = Buffer.from(bytes)
-
-    const newbytes = new Uint8Array(bytes.length + 1)
-    newbytes.set([opcode], 0)
-    newbytes.set(bytes, 1)
-
-    geckos.raw.emit(newbytes)
-
+    geckos.raw.emit(bytes)
 }
 
 const processPlayerData = (channel_id, bytes) => {
     const decodedMario = MarioMsg.deserializeBinary(bytes)
 
     //ignoring validation for now
-    if (decodedMario.getPlayername().length < 3 || decodedMario.getPlayername().length > 14) return
-
     if (allChannels[channel_id] == undefined) return
 
     /// Data is Valid
@@ -61,7 +53,7 @@ setInterval(async () => {
     const bytes = mariolistproto.serializeBinary()
     const compressedMsg = await deflate(bytes)
     stats.marioListSize = compressedMsg.length
-    broadcastDataWithOpcode(compressedMsg, 0)
+    broadcastData(compressedMsg)
     marioListCounter++
 
 }, 33)
@@ -73,13 +65,7 @@ geckos.onConnection(channel => {
     channel.emit('id', { id: channel.my_id }, { reliable: true })
 
     channel.onRaw(bytes => {
-        try {
-            const opcode = Buffer.from(bytes)[0]
-            switch (opcode) {
-                case 0: processPlayerData(channel.my_id, bytes.slice(1)); break
-                default: console.log("unknown opcode: " + opcode)
-            }
-        } catch (err) { console.log(err) }
+        processPlayerData(channel.my_id, bytes)
     })
 
     channel.onDisconnect(() => {
