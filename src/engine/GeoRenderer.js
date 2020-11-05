@@ -64,6 +64,19 @@ class GeoRenderer {
         res[2] = (a[2] + b[2]) / 2.0
     }
 
+    interpolate_angle(a, b) {
+        const absDiff = Math.abs(b - a)
+        if (absDiff >= 0x4000 && absDiff <= 0xC000) { return b }
+        if (absDiff <= 0x8000) { return (a + b) / 2 }
+        else { return (a + b) / 2 + 0x8000 }
+    }
+
+    interpolate_angles(res, a, b) {
+        res[0] = interpolate_angle(a[0], b[0])
+        res[1] = interpolate_angle(a[1], b[1])
+        res[2] = interpolate_angle(a[2], b[2])
+    }
+
     mtx_patch_interpolated() {
         
         if (this.sPerspectivePos != null) {
@@ -103,6 +116,7 @@ class GeoRenderer {
                     object.pos = Game.gDisplayList.length /// index of the mtx
                     object.mtx = displayNode.transform
                     object.displayList = displayNode.displayList
+                    gMtxTbl.push(object)
                     Gbi.gSPMatrix(Game.gDisplayList, displayNode.transformInterpolated, Gbi.G_MTX_MODELVIEW | Gbi.G_MTX_LOAD | Gbi.G_MTX_NOPUSH)
                     Gbi.gSPDisplayList(Game.gDisplayList, displayNode.displayListInterpolated)
 
@@ -158,8 +172,7 @@ class GeoRenderer {
             const mtxInterpolated = new Array(4).fill(0).map(() => new Array(4).fill(0))
             const perspNorm = {}
 
-            MathUtil.guPerspective(mtx, perspNorm,
-                node.wrapper.fov, aspect, node.wrapper.near, node.wrapper.far, 1.0)
+            MathUtil.guPerspective(mtx, perspNorm, node.wrapper.fov, aspect, node.wrapper.near, node.wrapper.far, 1.0)
             if (window.gGlobalTimer == node.prevTimestamp + 1) {
                 const fovInterpolated = (node.wrapper.prevFov + node.wrapper.fov) / 2.0;
                 MathUtil.guPerspective(mtxInterpolated, perspNorm,
@@ -204,12 +217,12 @@ class GeoRenderer {
         let focusInterpolated = [0,0,0]
 
         if (window.gGlobalTimer == node.prevTimestamp + 1) {
-            interpolate_vectors(posInterpolated, node.wrapper.prevPos, node.wrapper.pos);
-            interpolate_vectors(focusInterpolated, node.wrapper.prevFocus, node.wrapper.focus);
+            interpolate_vectors(posInterpolated, node.wrapper.prevPos, node.wrapper.pos)
+            interpolate_vectors(focusInterpolated, node.wrapper.prevFocus, node.wrapper.focus)
             let magnitude = 0;
             for (let i = 0; i < 3; i++) {
-                let diff = node.wrapper.pos[i] - node.wrapper.prevPos[i];
-                magnitude += diff * diff;
+                let diff = node.wrapper.pos[i] - node.wrapper.prevPos[i]
+                magnitude += diff * diff
             }
             if (magnitude > 500000) {
                 // Observed ~479000 in BBH when toggling R camera
@@ -223,18 +236,16 @@ class GeoRenderer {
         }
         node.wrapper.prevPos = [...node.wrapper.pos]
         node.wrapper.prevFocus = [...node.wrapper.focus]
-        node.prevTimestamp = window.gGlobalTimer;
-        MathUtil.mtxf_lookat(cameraTransform, posInterpolated, focusInterpolated, node.wrapper.roll);
-        MathUtil.mtxf_mul(this.gMatStackInterpolated[this.gMatStackIndex + 1], cameraTransform, this.gMatStackInterpolated[this.gMatStackIndex]);
+        node.prevTimestamp = window.gGlobalTimer
+        MathUtil.mtxf_lookat(cameraTransform, posInterpolated, focusInterpolated, node.wrapper.roll)
+        MathUtil.mtxf_mul(this.gMatStackInterpolated[this.gMatStackIndex + 1], cameraTransform, this.gMatStackInterpolated[this.gMatStackIndex])
             
 
         this.gMatStackIndex++
-        // MathUtil.mtxf_to_mtx(mtxInterpolated, this.gMatStackInterpolated[this.gMatStackIndex]);
-        this.gMatStackInterpolatedFixed[this.gMatStackIndex] = mtxInterpolated;
         if (node.children[0]) {
             this.gCurGraphNodeCamera = node
             node.wrapper.matrixPtr = this.gMatStack[this.gMatStackIndex]
-            // node.matrixPtrInterpolated = this.gMatStackInterpolated[this.gMatStackIndex];
+            node.wrapper.matrixPtrInterpolated = this.gMatStackInterpolated[this.gMatStackIndex]
             this.geo_process_node_and_siblings(node.children)
             this.gCurGraphNodeCamera = null
         }
@@ -253,8 +264,8 @@ class GeoRenderer {
             let focusInterpolated = [0,0,0];
 
             if (window.gGlobalTimer == node.prevCameraTimestamp + 1) {
-                interpolate_vectors(posInterpolated, node.prevCameraPos, Camera.gLakituState.pos);
-                interpolate_vectors(focusInterpolated, node.prevCameraFocus, Camera.gLakituState.focus);
+                interpolate_vectors(posInterpolated, node.wrapper.prevCameraPos, Camera.gLakituState.pos);
+                interpolate_vectors(focusInterpolated, node.wrapper.prevCameraFocus, Camera.gLakituState.focus);
             } else {
                 posInterpolated = [...Camera.gLakituState.pos]
                 focusInterpolated = [...Camera.gLakituState.focus]
@@ -262,19 +273,22 @@ class GeoRenderer {
             node.prevCameraPos = [...Camera.gLakituState.pos]
             node.prevCameraFocus = [...Camera.gLakituState.focus]
             node.prevCameraTimestamp = window.gGlobalTimer;
+
             list = node.wrapper.backgroundFunc(GraphNode.GEO_CONTEXT_RENDER, node.wrapper)
+
             posCopy = [...Camera.gLakituState.pos]
             focusCopy = [...Camera.gLakituState.focus]
             Camera.gLakituState.pos = [...posInterpolated]
             Camera.gLakituState.focus = [...focusInterpolated]
-            listInterpolated = node.wrapper.backgroundFunc(GraphNode.GEO_CONTEXT_RENDER, node.wrapper);
+
+            listInterpolated = node.wrapper.backgroundFunc(GraphNode.GEO_CONTEXT_RENDER, node.wrapper)
+
             Camera.gLakituState.pos = [...posCopy]
             Camera.gLakituState.focus = [...focusCopy]
 
         }
 
         if (list.length > 0) {
-            // this.geo_append_display_list(list, node.flags >> 8)
             this.geo_append_display_list2(list, listInterpolated, node.flags >> 8)
         } else if (this.gCurGraphNodeMasterList) {
             const gfx = []
@@ -311,6 +325,7 @@ class GeoRenderer {
 
         const scaleVec = [ node.wrapper.scale, node.wrapper.scale, node.wrapper.scale ]
         MathUtil.mtxf_scale_vec3f(this.gMatStack[this.gMatStackIndex + 1], this.gMatStack[this.gMatStackIndex], scaleVec)
+        MathUtil.mtxf_scale_vec3f(this.gMatStackInterpolated[this.gMatStackIndex + 1], this.gMatStackInterpolated[this.gMatStackIndex], scaleVec)
         this.gMatStackIndex++
 
         if (node.wrapper.displayList) {
@@ -326,9 +341,19 @@ class GeoRenderer {
     }
 
     geo_process_rotation(node) {
-        const mtxf = new Array(4).fill(0).map(() => new Array(4).fill(0))
-        MathUtil.mtxf_rotate_zxy_and_translate(mtxf, [0, 0, 0], node.wrapper.rotation)
-        MathUtil.mtxf_mul(this.gMatStack[this.gMatStackIndex + 1], mtxf, this.gMatStack[this.gMatStackIndex])
+        const mtx = new Array(4).fill(0).map(() => new Array(4).fill(0))
+        const rotationInterpolated = [ 0, 0, 0 ]
+        MathUtil.mtxf_rotate_zxy_and_translate(mtx, [0, 0, 0], node.wrapper.rotation)
+        MathUtil.mtxf_mul(this.gMatStack[this.gMatStackIndex + 1], mtx, this.gMatStack[this.gMatStackIndex])
+
+        if (window.gGlobalTimer == node.prevTimestamp + 1) {
+            interpolate_angles(rotationInterpolated, node.wrapper.prevRotation, node.wrapper.rotation)
+            MathUtil.mtxf_rotate_zxy_and_translate(mtx, [0, 0, 0], rotationInterpolated)
+        }
+        node.prevRotation = [...node.rotation]
+        node.prevTimestamp = window.gGlobalTimer
+        MathUtil.mtxf_mul(this.gMatStackInterpolated[this.gMatStackIndex + 1], mtx, this.gMatStackInterpolated[this.gMatStackIndex])
+
         this.gMatStackIndex++
         if (node.wrapper.displayList) {
             this.geo_append_display_list(node.wrapper.displayList, node.flags >> 8)
@@ -554,14 +579,16 @@ class GeoRenderer {
     geo_append_display_list2(displayList, displayListInterpolated, layer) {
 
         const gMatStackCopy = new Array(4).fill(0).map(() => new Array(4).fill(0))
+        const gMatStackCopyInterpolated = new Array(4).fill(0).map(() => new Array(4).fill(0))
         MathUtil.mtxf_to_mtx(gMatStackCopy, this.gMatStack[this.gMatStackIndex])
+        MathUtil.mtxf_to_mtx(gMatStackCopyInterpolated, this.gMatStackInterpolated[this.gMatStackIndex])
 
         if (this.gCurGraphNodeMasterList) {
             const listNode = {
                 transform: gMatStackCopy,
-                transformInterpolated: this.gMatStackInterpolatedFixed[this.gMatStackIndex],
-                displayListInterpolated: displayListInterpolated,
-                displayList
+                transformInterpolated: gMatStackCopyInterpolated,
+                displayList,
+                displayListInterpolated: displayListInterpolated
             }
 
             if (this.gCurGraphNodeMasterList.wrapper.listHeads[layer]) {
