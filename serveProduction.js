@@ -1,4 +1,4 @@
-const { MarioMsg, MarioListMsg } = require("./proto/mario_pb")
+const { MarioMsg, MarioListMsg, Sm64JsMsg, ConnectedMsg } = require("./proto/mario_pb")
 const http = require('http')
 const util = require('util')
 const zlib = require('zlib')
@@ -46,11 +46,12 @@ setInterval(async () => {
         else if (data.decodedMario) data.channel.close()
     })
 
+    const sm64jsMsg = new Sm64JsMsg()
     const mariolist = Object.values(allChannels).filter(data => data.decodedMario).map(data => data.decodedMario)
     const mariolistproto = new MarioListMsg()
     mariolistproto.setMarioList(mariolist)
-    mariolistproto.setMessagecount(marioListCounter)
-    const bytes = mariolistproto.serializeBinary()
+    sm64jsMsg.setListMsg(mariolistproto)
+    const bytes = sm64jsMsg.serializeBinary()
     const compressedMsg = await deflate(bytes)
     stats.marioListSize = compressedMsg.length
     broadcastData(compressedMsg)
@@ -58,11 +59,17 @@ setInterval(async () => {
 
 }, 33)
 
-geckos.onConnection(channel => {
+geckos.onConnection(async (channel) => {
 
     channel.my_id = generateID()
-    allChannels[channel.my_id] = { valid: 0, channel, chatCooldown: 0 }
-    channel.emit('id', { id: channel.my_id }, { reliable: true })
+    allChannels[channel.my_id] = { valid: 0, channel }
+    const sm64jsMsg = new Sm64JsMsg()
+    const connectedMsg = new ConnectedMsg()
+    connectedMsg.setChannelid(channel.my_id)
+    sm64jsMsg.setConnectedMsg(connectedMsg)
+    const bytes = sm64jsMsg.serializeBinary()
+    const compressedMsg = await deflate(bytes)
+    channel.raw.emit(compressedMsg, { reliable: true })
 
     channel.onRaw(bytes => {
         processPlayerData(channel.my_id, bytes)

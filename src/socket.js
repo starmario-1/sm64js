@@ -1,5 +1,7 @@
 import geckos from '@geckos.io/client'
 import * as Multi from "./game/MultiMarioManager"
+import zlib from "zlib"
+import { Sm64JsMsg } from "../proto/mario_pb"
 
 const url = new URL(window.location.href)
 const port = url.protocol == "https:" ? 443 : 9208
@@ -26,9 +28,30 @@ channel.onConnect((err) => {
 
     channel.readyState = 1
 
-    channel.onRaw((message) => {
-        const bytes = new Uint8Array(message)
-        if (multiplayerReady()) Multi.recvMarioData(bytes)
+    channel.onRaw((bytes) => {
+        zlib.inflate(new Uint8Array(bytes), (err, buffer) => {
+            if (err) {
+                console.error(`decompression fail ${err}`)
+                return
+            }
+            const sm64jsMsg = Sm64JsMsg.deserializeBinary(buffer)
+            switch (sm64jsMsg.getMessageCase()) {
+                case Sm64JsMsg.MessageCase.LIST_MSG:
+                    if (!multiplayerReady()) return
+                    const listMsg = sm64jsMsg.getListMsg()
+                    const marioList = listMsg.getMarioList()
+                    Multi.recvMarioData(marioList)
+                    break
+                case Sm64JsMsg.MessageCase.CONNECTED_MSG:
+                    const connectedMsg = sm64jsMsg.getConnectedMsg()
+                    const channelID = connectedMsg.getChannelid()
+                    networkData.myChannelID = channelID
+                    break
+                case Sm64JsMsg.MessageCase.MESSAGE_NOT_SET:
+                default:
+                    throw new Error(`unhandled case in switch expression: ${sm64jsMsg.getMessageCase()}`)
+            }
+        })
     })
 
     channel.on('id', msg => { networkData.myChannelID = msg.id })
