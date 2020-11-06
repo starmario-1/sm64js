@@ -1,5 +1,4 @@
 import { MarioMsg, MarioListMsg, ControllerListMsg, ControllerMsg, ValidPlayersMsg } from "../../proto/mario_pb"
-import zlib from "zlib"
 import * as RAW from "../include/object_constants"
 import { networkData, gameData } from "../socket"
 import { defaultSkinData } from "../cosmetics"
@@ -252,31 +251,24 @@ export const recvValidPlayers = (validplayerbytes) => {
 }
 
 
-export const recvMarioData = (mariolistbytes) => {
+export const recvMarioData = (marioList) => {
 
-    zlib.inflate(mariolistbytes, (err, buffer) => {
-        if (!err) {
-            const marioListProto = MarioListMsg.deserializeBinary(buffer)
-            const marioList = marioListProto.getMarioList()
-            networkData.numOnline = marioList.length
-            marioList.forEach(marioProto => {
-                const id = marioProto.getChannelid()
-                if (id == networkData.myChannelID) return
+    networkData.numOnline = marioList.length
+    marioList.forEach(marioProto => {
+        const id = marioProto.getChannelid()
+        if (id == networkData.myChannelID) return
 
-                if (networkData.remotePlayers[id] == undefined) {
-                    networkData.remotePlayers[id] = { 
-                        marioState: initNewRemoteMarioState(marioProto),
-                        skinData: defaultSkinData(),
-                        crashCount: 0,
-                        skipRender: 0
-                    }
-                    applyController(marioProto.getController())
-                } else {
-                    updateRemoteMarioState(id, marioProto)
-                }
-            })
-            
+        if (networkData.remotePlayers[id] == undefined) {
+            networkData.remotePlayers[id] = { 
+                marioState: initNewRemoteMarioState(marioProto),
+                skinData: defaultSkinData(),
+                crashCount: 0,
+                skipRender: 0
+            }
+            applyController(marioProto.getController())
+        } else {
+            updateRemoteMarioState(id, marioProto)
         }
-    })
+    })    
 
 }

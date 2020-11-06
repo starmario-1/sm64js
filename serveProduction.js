@@ -1,4 +1,4 @@
-const { MarioMsg, MarioListMsg } = require("./proto/mario_pb")
+const { MarioMsg, MarioListMsg, Sm64JsMsg, ConnectedMsg } = require("./proto/mario_pb")
 const http = require('http')
 const util = require('util')
 const zlib = require('zlib')
@@ -38,10 +38,12 @@ setInterval(async () => {
         else if (data.decodedMario) data.channel.close()
     })
 
+    const sm64jsMsg = new Sm64JsMsg()
     const mariolist = Object.values(allChannels).filter(data => data.decodedMario).map(data => data.decodedMario)
     const mariolistproto = new MarioListMsg()
     mariolistproto.setMarioList(mariolist)
-    const bytes = mariolistproto.serializeBinary()
+    sm64jsMsg.setListMsg(mariolistproto)
+    const bytes = sm64jsMsg.serializeBinary()
     const compressedMsg = await deflate(bytes)
     broadcastData(compressedMsg)
 
@@ -49,10 +51,16 @@ setInterval(async () => {
 
 require('uWebSockets.js').App().ws('/*', {
 
-    open: (channel) => {
+    open: async (channel) => {
         channel.my_id = generateID()
         allChannels[channel.my_id] = { valid: 0, channel }
-        channel.send(JSON.stringify({ id: channel.my_id }), false)
+        const sm64jsMsg = new Sm64JsMsg()
+        const connectedMsg = new ConnectedMsg()
+        connectedMsg.setChannelid(channel.my_id)
+        sm64jsMsg.setConnectedMsg(connectedMsg)
+        const bytes = sm64jsMsg.serializeBinary()
+        const compressedMsg = await deflate(bytes)
+        channel.send(compressedMsg, true)
     },
 
     message: (channel, bytes) => {
