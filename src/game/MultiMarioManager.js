@@ -1,4 +1,4 @@
-import { MarioMsg, MarioListMsg, ControllerListMsg, ControllerMsg, ValidPlayersMsg } from "../../proto/mario_pb"
+import { Sm64JsMsg, MarioMsg, ControllerListMsg, ControllerMsg, ValidPlayersMsg } from "../../proto/mario_pb"
 import * as RAW from "../include/object_constants"
 import { networkData, gameData } from "../socket"
 import { defaultSkinData } from "../cosmetics"
@@ -99,7 +99,10 @@ export const createMarioProtoMsg = () => {
     mariomsg.setChannelid(networkData.myChannelID)
     mariomsg.setPlayername(window.myMario.playerName)
 
-    return mariomsg.serializeBinary()
+    const sm64jsMsg = new Sm64JsMsg()
+    sm64jsMsg.setMarioMsg(mariomsg)
+
+    return sm64jsMsg.serializeBinary()
 }
 
 const initNewRemoteMarioState = (marioProto) => {
@@ -250,24 +253,27 @@ export const recvValidPlayers = (validplayerbytes) => {
     })
 }
 
-export const recvMarioData = (marioList) => {
+let lastMessageProcessed = -1
+export const recvMarioData = (marioList, messageCount) => {
 
-    networkData.numOnline = marioList.length
-    marioList.forEach(marioProto => {
-        const id = marioProto.getChannelid()
-        if (id == networkData.myChannelID) return
+    if (messageCount > lastMessageProcessed) {
 
-        if (networkData.remotePlayers[id] == undefined) {
-            networkData.remotePlayers[id] = { 
-                marioState: initNewRemoteMarioState(marioProto),
-                skinData: defaultSkinData(),
-                crashCount: 0,
-                skipRender: 0
+        networkData.numOnline = marioList.length
+        marioList.forEach(marioProto => {
+            const id = marioProto.getChannelid()
+            if (id == networkData.myChannelID) return
+
+            if (networkData.remotePlayers[id] == undefined) {
+                networkData.remotePlayers[id] = {
+                    marioState: initNewRemoteMarioState(marioProto),
+                    skinData: defaultSkinData(),
+                    crashCount: 0,
+                    skipRender: 0
+                }
+                applyController(marioProto.getController())
+            } else {
+                updateRemoteMarioState(id, marioProto)
             }
-            applyController(marioProto.getController())
-        } else {
-            updateRemoteMarioState(id, marioProto)
-        }
-    })    
-
+        })
+    }
 }

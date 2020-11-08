@@ -27,8 +27,7 @@ const broadcastData = (bytes) => {
     geckos.raw.emit(bytes)
 }
 
-const processPlayerData = (channel_id, bytes) => {
-    const decodedMario = MarioMsg.deserializeBinary(bytes)
+const processPlayerData = (channel_id, decodedMario) => {
 
     //ignoring validation for now
     if (allChannels[channel_id] == undefined) return
@@ -53,6 +52,7 @@ setInterval(async () => {
     const mariolist = Object.values(allChannels).filter(data => data.decodedMario).map(data => data.decodedMario)
     const mariolistproto = new MarioListMsg()
     mariolistproto.setMarioList(mariolist)
+    mariolistproto.setMessagecount(marioListCounter)
     sm64jsMsg.setListMsg(mariolistproto)
     const bytes = sm64jsMsg.serializeBinary()
     const compressedMsg = await deflate(bytes)
@@ -74,9 +74,20 @@ geckos.onConnection(async (channel) => {
     const compressedMsg = await deflate(bytes)
     channel.raw.emit(compressedMsg, { reliable: true })
 
-    channel.onRaw(bytes => {
-        processPlayerData(channel.my_id, bytes)
+    channel.onRaw(async (bytes) => {
+        const sm64jsMsg = Sm64JsMsg.deserializeBinary(bytes)
+        switch (sm64jsMsg.getMessageCase()) {
+            case Sm64JsMsg.MessageCase.MARIO_MSG:
+                processPlayerData(channel.my_id, sm64jsMsg.getMarioMsg()); break
+            case Sm64JsMsg.MessageCase.PING_MSG:
+                const compressedMsg = await deflate(bytes)
+                channel.raw.emit(compressedMsg, { reliable: true }); break  ///ping pong
+            case Sm64JsMsg.MessageCase.MESSAGE_NOT_SET:
+            default:
+                throw new Error(`unhandled case in switch expression: ${sm64jsMsg.getMessageCase()}`)
+        }
     })
+
 
     channel.onDisconnect(() => {
         delete allChannels[channel.my_id]
