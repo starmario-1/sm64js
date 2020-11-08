@@ -1,4 +1,4 @@
-import { MarioMsg, MarioListMsg, ControllerListMsg, ControllerMsg, ValidPlayersMsg } from "../../proto/mario_pb"
+import { Sm64JsMsg, MarioMsg, ControllerListMsg, ControllerMsg, ValidPlayersMsg } from "../../proto/mario_pb"
 import * as RAW from "../include/object_constants"
 import { networkData, gameData } from "../socket"
 import { defaultSkinData } from "../cosmetics"
@@ -99,7 +99,10 @@ export const createMarioProtoMsg = () => {
     mariomsg.setChannelid(networkData.myChannelID)
     mariomsg.setPlayername(window.myMario.playerName)
 
-    return mariomsg.serializeBinary()
+    const sm64jsMsg = new Sm64JsMsg()
+    sm64jsMsg.setMarioMsg(mariomsg)
+
+    return sm64jsMsg.serializeBinary()
 }
 
 const initNewRemoteMarioState = (marioProto) => {

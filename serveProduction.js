@@ -19,8 +19,7 @@ const broadcastData = (bytes) => {
     Object.values(allChannels).forEach(s => { s.channel.send(bytes, true) })
 }
 
-const processPlayerData = (channel_id, bytes) => {
-    const decodedMario = MarioMsg.deserializeBinary(bytes)
+const processPlayerData = (channel_id, decodedMario) => {
 
     //ignoring validation for now
     if (decodedMario.getPlayername().length < 3 || decodedMario.getPlayername().length > 14) return
@@ -66,8 +65,18 @@ require('uWebSockets.js').App().ws('/*', {
         channel.send(compressedMsg, true)
     },
 
-    message: (channel, bytes) => {
-        processPlayerData(channel.my_id, bytes)
+    message: async (channel, bytes) => {
+        const sm64jsMsg = Sm64JsMsg.deserializeBinary(bytes)
+        switch (sm64jsMsg.getMessageCase()) {
+            case Sm64JsMsg.MessageCase.MARIO_MSG:
+                processPlayerData(channel.my_id, sm64jsMsg.getMarioMsg()); break
+            case Sm64JsMsg.MessageCase.PING_MSG:
+                const compressedMsg = await deflate(bytes)
+                channel.send(compressedMsg, true); break  ///ping pong
+            case Sm64JsMsg.MessageCase.MESSAGE_NOT_SET:
+            default:
+                throw new Error(`unhandled case in switch expression: ${sm64jsMsg.getMessageCase()}`)
+        }
     },
 
     close: (channel) => {
