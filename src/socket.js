@@ -82,15 +82,17 @@ export const post_main_loop_one_iteration = (frame) => {
 
     if (frame % 30 == 0) updateConnectedMsg()
 
-    if (multiplayerReady() && frame % 1 == 0) {
-        sendData(Multi.createMarioProtoMsg())
-
+    if (frame % 150 == 0) { //every 5 seconds
         /// ping to measure latency
         const sm64jsMsg = new Sm64JsMsg()
         const pingmsg = new PingMsg()
         pingmsg.setTime(performance.now())
         sm64jsMsg.setPingMsg(pingmsg)
         sendData(sm64jsMsg.serializeBinary())
+    }
+
+    if (multiplayerReady() && frame % 1 == 0) {
+        sendData(Multi.createMarioProtoMsg())
     }
 
 }
